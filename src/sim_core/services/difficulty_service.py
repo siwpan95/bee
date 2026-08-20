@@ -193,13 +193,25 @@ class DifficultyService:
         k = min(n, len(self._enemy_affixes))
         return random.sample(self._enemy_affixes, k=k)
 
-    def _roll_rarity(self) -> tuple:
-        """摇稀有度 → (名称, 属性倍率, min词缀, max词缀)"""
+    def _roll_rarity(self, level: float = 1.0) -> tuple:
+        """摇稀有度 → (名称, 属性倍率, min词缀, max词缀)
+
+        低等级保护：Lv<5 仅普通、Lv<10 解锁精英、Lv<20 解锁稀有、
+        传说仅 Lv≥20 出现，避免新手角色撞上 5 倍属性怪。
+        """
+        if level < 5:
+            table = self.RARITY_TABLE[:1]
+        elif level < 10:
+            table = self.RARITY_TABLE[:2]
+        elif level < 20:
+            table = self.RARITY_TABLE[:3]
+        else:
+            table = self.RARITY_TABLE
         roll = random.random()
-        for name, mult, min_a, max_a, threshold, prefix in self.RARITY_TABLE:
+        for name, mult, min_a, max_a, threshold, prefix in table:
             if roll < threshold:
                 return (name, mult, min_a, max_a, prefix)
-        return ("普通", 1.0, 1, 3, "")  # fallback
+        return (table[-1][0], table[-1][1], table[-1][2], table[-1][3], table[-1][5])
 
     def _parse_affix_effects(self, affixes: List[str]) -> dict:
         """解析词缀关键词 → 战斗效果字典"""
@@ -464,9 +476,12 @@ class DifficultyService:
         enemy_tags = list(template.get("tags", []))
 
         # ── 稀有度 ──
-        rarity_name, rarity_mult, min_affix, max_affix, rarity_prefix = self._roll_rarity()
+        rarity_name, rarity_mult, min_affix, max_affix, rarity_prefix = self._roll_rarity(avg_lv)
 
-        # ── 词缀 ──
+        # ── 词缀（低等级收敛词缀数，避免回复词缀堆叠成死亡螺旋）──
+        level_affix_cap = self._max_affixes(avg_lv)
+        min_affix = min(min_affix, level_affix_cap)
+        max_affix = min(max_affix, level_affix_cap)
         rolled = self._roll_affixes(avg_lv, min_affix, max_affix)
         affix_effects = self._parse_affix_effects(rolled)
 

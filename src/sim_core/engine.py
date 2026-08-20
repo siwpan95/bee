@@ -47,9 +47,12 @@ from src.config import settings as _settings
 class SimCore:
     """模拟内核：状态 + 逻辑。宿主驱动 update(dt)。"""
 
-    def __init__(self, audio=None, save_path=None, load_existing=True):
+    def __init__(self, audio=None, save_path=None, load_existing=True, theme=None):
         # ── 服务构造（镜像原 GameController.__init__）──
         self.data_service = DataService()
+        # 主题包（P0：异界 DLC）。显式复位单例池主题，避免跨实例泄漏。
+        self.theme_name = theme
+        self.data_service.set_theme(theme)
         init_race_class_config()  # 零 I/O：仅硬编码回退
         self.item_service = ItemService(data_service=self.data_service)
         self.difficulty_service = DifficultyService()
@@ -141,6 +144,18 @@ class SimCore:
                 self._add_log(f"☠ {self.character.name} 已阵亡！")
                 self._add_log(f"战绩 — Lv.{self.character.level} 击杀:{self.character.kills} "
                               f"死亡:{self.character.deaths} 金币:{self.character.gold}")
+                # DDA 反馈回路：阵亡视为高威胁战斗 → 提升回血抑制，
+                # 避免 Lv.1 新角色对高回复词缀敌人陷入死亡螺旋。
+                try:
+                    enemy = self.combat_service.current_enemy or {}
+                    combat_duration = max(0, self.game_time - self._combat_start_time)
+                    total_damage = self.combat_service.get_total_fight_damage()
+                    self.difficulty_service.on_combat_end(
+                        combat_duration, False, total_damage,
+                        enemy.get("max_hp", 1), enemy.get("regen", 0),
+                    )
+                except Exception:
+                    pass
                 # 名人堂结算（跨重开累积 + 破纪录播报，失败不影响重开）
                 try:
                     run = {
@@ -676,6 +691,12 @@ class SimCore:
         # ── 加载敌人词缀池（前缀/标签系统）──
         self._load_affix_pool()
 
+        # ── 主题包（异界 DLC）──
+        if self.theme_name:
+            meta = self.data_service.get_theme_meta()
+            display = (meta or {}).get("name", self.theme_name)
+            self._add_log(f"[系统] 主题已加载: {display}")
+
         # 尝试读取存档
         if not self._load_game():
             self._init_new_game()
@@ -837,11 +858,13 @@ class SimCore:
         # ── 清空日志 ──
         self.log_messages.clear()
 
-        # ── 全新 DDA ──
+        # ── 全新 DDA（继承上世的回血抑制反馈，避免死亡螺旋跨世复发）──
+        old_dda = self.difficulty_service
         self.difficulty_service = DifficultyService()
+        self.difficulty_service.load_dict(old_dda.to_dict())
         self.combat_service.difficulty_service = self.difficulty_service
         self._load_affix_pool()  # 重新注入词缀池
-        self._add_log("[系统] 动态难度已重置")
+        self._add_log("[系统] 动态难度已就绪（继承上世反馈）")
 
         # ── 随机角色 + 全新世界 ──
         races = list(Race)
@@ -1016,10 +1039,24 @@ class SimCore:
         except Exception as e:
             self._add_log(f"[系统] 保存失败: {e}")
 
-    def _load_game(self):
-        """读取存档 — 增加详细错误日志，便于排查静默失败问题"""
+    def _backup_corrupt_save(self, save_path: str, reason: str) -> bool:
+        """损坏存档自动备份并引导新建游戏（stay 式不可信存档容错）"""
+        import time
+        backup = f"{save_path}.corrupt-{int(time.time())}"
         try:
-            save_path = self._get_save_path()
+            if os.path.exists(save_path):
+                os.replace(save_path, backup)
+            self._add_log(
+                f"[读档] 存档损坏（{reason}），已备份为 {os.path.basename(backup)}，将创建新游戏"
+            )
+        except Exception:
+            self._add_log(f"[读档] 存档损坏（{reason}），备份失败，将创建新游戏")
+        return False
+
+    def _load_game(self):
+        """读取存档 — 详细错误日志 + 损坏存档自动备份（stay 式容错）"""
+        save_path = self._get_save_path()
+        try:
             if not os.path.exists(save_path):
                 self._add_log(f"[系统] 未找到存档: {save_path}，将创建新游戏")
                 return False
@@ -1125,16 +1162,14 @@ class SimCore:
             self._add_log("[系统] 未找到存档文件，将创建新游戏")
             return False
         except json.JSONDecodeError as e:
-            self._add_log(f"[系统] 存档JSON解析失败: {e}，将创建新游戏")
-            return False
+            return self._backup_corrupt_save(save_path, f"JSON解析失败: {e}")
         except Exception as e:
             import traceback
             tb = traceback.format_exc()
-            self._add_log(f"[系统] 读档异常: {e}，将创建新游戏")
             # 写入 crash.log 便于排查
             try:
                 with open(os.path.join(self._get_save_dir(), "crash.log"), "w", encoding="utf-8") as f:
                     f.write(f"[LOAD ERROR] {e}\n\n{tb}\n")
             except Exception:
                 pass
-            return False
+            return self._backup_corrupt_save(save_path, f"读档异常: {e}")

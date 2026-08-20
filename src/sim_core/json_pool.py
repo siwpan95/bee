@@ -43,6 +43,7 @@ class JSONPool:
         self.base_dir = self._get_base_dir()
         self.data_dir = os.path.join(self.base_dir, "resources", "data")
         self._cache = {}
+        self._theme_dir = None  # 主题包目录（异界 DLC），None = 默认数据
 
         # JSON 文件名映射（key → filename.json）
         self.json_files = {
@@ -151,13 +152,40 @@ class JSONPool:
         self.clear_cache(key)
         return self.get_data(key)
 
+    # ── 主题包（P0：异界 DLC，数据优先于默认目录）────────
+
+    def set_theme(self, theme_name: str = None):
+        """切换主题包：resources/themes/<name> 优先，缺失文件回退默认数据目录"""
+        self._theme_dir = None
+        if theme_name:
+            candidate = os.path.join(self.base_dir, "resources", "themes", str(theme_name))
+            if os.path.isdir(candidate):
+                self._theme_dir = candidate
+        self.clear_cache()
+
+    def get_theme_meta(self) -> Optional[dict]:
+        """返回当前主题的 meta.json（无主题或缺失时返回 None）"""
+        if not self._theme_dir:
+            return None
+        path = os.path.join(self._theme_dir, "meta.json")
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except Exception:
+            return None
+
     # ── 内部：读 JSON 文件 ────────────────────────────
 
     def _read_json(self, key: str) -> Optional[List[Dict]]:
         json_file = self.json_files.get(key)
         if not json_file:
             return None
+        # 主题优先：主题目录存在同名文件则用它，否则回退默认目录
         path = os.path.join(self.data_dir, json_file)
+        if self._theme_dir:
+            theme_path = os.path.join(self._theme_dir, json_file)
+            if os.path.exists(theme_path):
+                path = theme_path
         if not os.path.exists(path):
             return None
         try:

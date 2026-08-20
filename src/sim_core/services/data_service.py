@@ -21,6 +21,15 @@ class DataService:
         self._pool.clear_cache()
         logger.info("数据缓存已清除，下次访问将重新加载")
 
+    def set_theme(self, theme_name: str = None):
+        """切换主题包（P0：异界 DLC）；None 恢复默认数据目录"""
+        self._pool.set_theme(theme_name)
+        logger.info("主题切换: %s", theme_name or "默认")
+
+    def get_theme_meta(self) -> Optional[dict]:
+        """当前主题元信息（无主题时为 None）"""
+        return self._pool.get_theme_meta()
+
     def get_item_templates(self) -> dict:
         """获取物品模板数据（首次访问时从 JSON 加载）"""
         return self._pool.get_item_templates()
