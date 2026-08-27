@@ -20,7 +20,7 @@
 - `SimCore(theme="warcraft")` 切换主题：`src/resources/themes/<id>/` 下的 JSON 优先于默认数据，缺失自动回退
 - 已内置 10 个主题：魔兽/暗黑/原神/宝可梦/英雄联盟/最终幻想/战锤40K/中古战锤/塞尔达（来自 pq_multiverse）+ 经典 Progress Quest（来自 progress_quest）
 - 重新导入：`python tools/import_pq_themes.py` / `python tools/import_pq_classic.py`
-- 详见 `docs/architecture/merge-plan.md`（G:\games 并入计划）
+- 详见 `docs/architecture/merge-plan.md`（引擎并入计划，历史文档）
 
 ## 测试状态
 - py_compile 语法检查通过（全部 .py）
