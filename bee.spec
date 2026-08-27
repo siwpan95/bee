@@ -1,12 +1,12 @@
-# -*- mode: python ; coding: utf-8 -*-
+﻿# -*- mode: python ; coding: utf-8 -*-
 # bee 安装包样板 spec（2026-08-25）
 a = Analysis(
-    ['G:/media/bee/main.pyw'],
-    pathex=['G:/media/bee'],
+    ['G:/repos/bee/main.pyw'],
+    pathex=['G:/repos/bee'],
     binaries=[],
     datas=[
-        ('G:/media/bee/src/resources', 'src/resources'),
-        ('G:/media/bee/src/resources', 'resources'),
+        ('G:/repos/bee/src/resources', 'src/resources'),
+        ('G:/repos/bee/src/resources', 'resources'),
     ],
     hiddenimports=[],
     hookspath=[],
