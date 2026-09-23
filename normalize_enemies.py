@@ -1,7 +1,15 @@
 import openpyxl
 import os
 
-xlsx_path = 'D:/allin/bee/src/resources/config/game_config.xlsx'
+# 2026-09-23 去本地化：配置表路径改由 命令行参数 → 仓内相对路径 推导
+# （原 D:/allin/bee/src/resources/config/game_config.xlsx 已不存在）
+import sys
+from pathlib import Path
+
+_DEFAULT_XLSX = Path(__file__).resolve().parent / "src" / "resources" / "config" / "game_config.xlsx"
+xlsx_path = Path(sys.argv[1]) if len(sys.argv) > 1 else _DEFAULT_XLSX
+if not xlsx_path.is_file():
+    raise SystemExit(f"[错误] 找不到敌人配置表：{xlsx_path}\n  用法：python normalize_enemies.py [game_config.xlsx 路径]")
 
 wb = openpyxl.load_workbook(xlsx_path)
 ws = wb['敌人模板']
