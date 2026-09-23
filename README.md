@@ -1,5 +1,7 @@
 # Bee（蜜蜂挂机 RPG / 无尽的进度条）
 
+> 仓库：<https://gitee.com/siwpan/bee> ｜ 许可：MIT（见 [LICENSE](LICENSE)）
+
 一款蜜蜂主题的挂机 RPG（放置进度条）游戏，支持系统托盘与实时音频。
 
 ## 语言 / 类型
@@ -13,7 +15,7 @@
 - `无尽的进度条3.0.exe` —— 已打包可执行文件
 
 ## 运行方式与依赖
-- 运行：`F:\Python314\python.exe main.pyw`
+- 运行：`python main.pyw`
 - 依赖（`requirements.txt`）：numpy、scipy（音频合成，必需）；pystray、Pillow、openpyxl、sounddevice（可选）
 
 ## 主题包（异界 DLC）
