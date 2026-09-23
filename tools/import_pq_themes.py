@@ -4,6 +4,13 @@
 用法：
     python tools/import_pq_themes.py [pq_multiverse 项目路径]
 
+    数据源根目录解析顺序（去本地化，命令行优先）：
+      1) 命令行参数 [pq_multiverse 项目路径]
+      2) 环境变量 PQ_MULTIVERSE_SRC
+      3) 由本仓位置推导的候选（<工作区>/pq_multiverse、<工作区>/pq-multiverse、
+         <工作区上级>/local/pq-multiverse）
+      4) 都不成立则报错退出，并提示应设置哪个变量
+
 读取 <pq_multiverse>/src/themes/data/<theme>/ 下的
 meta / monsters / prefixes / spells，转换为 bee 主题包：
 
@@ -17,9 +24,30 @@ import json
 import os
 import sys
 
-DEFAULT_SRC = "G:/games/pq_multiverse"
+ENV_SRC = "PQ_MULTIVERSE_SRC"       # 环境变量：pq_multiverse 项目根目录
+_SRC_MARKER = os.path.join("src", "themes", "data")   # 数据源特征目录
 BEE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_WORKSPACE = os.path.dirname(BEE_ROOT)                 # 本仓所在工作区（G:\repos 一类）
 THEMES_OUT = os.path.join(BEE_ROOT, "src", "resources", "themes")
+
+
+def resolve_src_root(explicit=None):
+    """解析 pq_multiverse 项目根目录（去本地化）。
+
+    优先级：命令行参数 > 环境变量 PQ_MULTIVERSE_SRC > 由本仓位置推导的候选 > None（调用方 fail-loud）。
+    候选均为相对本仓位置推导，不写死任何本机绝对路径。
+    """
+    if explicit:
+        return explicit
+    env = os.environ.get(ENV_SRC, "").strip()
+    if env:
+        return env
+    for cand in (os.path.join(_WORKSPACE, "pq_multiverse"),
+                 os.path.join(_WORKSPACE, "pq-multiverse"),
+                 os.path.join(os.path.dirname(_WORKSPACE), "local", "pq-multiverse")):
+        if os.path.isdir(os.path.join(cand, _SRC_MARKER)):
+            return cand
+    return None
 
 # PQ 前缀分类 → 中文戏谑版（保留 PQ 幽默感；未收录的原文保留）
 PQ_PREFIX_TRANS = {
@@ -96,7 +124,13 @@ def import_theme(theme_id: str, src_dir: str) -> tuple:
     return len(enemies), len(prefixes), len(spells)
 
 
-def main(src_root: str = DEFAULT_SRC) -> int:
+def main(src_root=None) -> int:
+    src_root = resolve_src_root(src_root)
+    if not src_root:
+        print("✗ 未找到 pq_multiverse 数据源。")
+        print("  请用命令行参数指定，或设置环境变量 "
+              f"{ENV_SRC} 指向含 {_SRC_MARKER} 的项目根目录。")
+        return 1
     themes_dir = os.path.join(src_root, "src", "themes", "data")
     if not os.path.isdir(themes_dir):
         print("未找到 pq_multiverse 主题目录:", themes_dir)
@@ -119,4 +153,4 @@ def main(src_root: str = DEFAULT_SRC) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else DEFAULT_SRC))
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else None))

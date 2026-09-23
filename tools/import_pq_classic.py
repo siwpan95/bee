@@ -4,6 +4,13 @@
 用法：
     python tools/import_pq_classic.py [progress_quest 项目路径]
 
+    数据源根目录解析顺序（去本地化，命令行优先）：
+      1) 命令行参数 [progress_quest 项目路径]
+      2) 环境变量 PQ_CLASSIC_SRC
+      3) 由本仓位置推导的同级候选（<工作区>/progress_quest、<工作区>/table-hanging-machine，
+         PQ 内容现行落点即 table-hanging-machine/data/pq_*.py）
+      4) 都不成立则报错退出，并提示应设置哪个变量
+
 读取 <progress_quest>/data/pq_*.py 模块（怪物/种族/职业/法术/特殊宝物），
 生成主题包：
 
@@ -21,9 +28,29 @@ import os
 import random
 import sys
 
-DEFAULT_SRC = "G:/games/progress_quest"
+ENV_SRC = "PQ_CLASSIC_SRC"          # 环境变量：progress_quest 项目根目录
+_SRC_MARKER = os.path.join("data", "pq_monsters.py")   # 数据源特征文件
 BEE_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+_WORKSPACE = os.path.dirname(BEE_ROOT)                 # 本仓所在工作区（G:\repos 一类）
 THEME_OUT = os.path.join(BEE_ROOT, "src", "resources", "themes", "pq_classic")
+
+
+def resolve_src_root(explicit=None):
+    """解析 progress_quest 数据源根目录（去本地化）。
+
+    优先级：命令行参数 > 环境变量 PQ_CLASSIC_SRC > 由本仓位置推导的候选 > None（调用方 fail-loud）。
+    候选均为相对本仓位置推导，不写死任何本机绝对路径。
+    """
+    if explicit:
+        return explicit
+    env = os.environ.get(ENV_SRC, "").strip()
+    if env:
+        return env
+    for cand in (os.path.join(_WORKSPACE, "progress_quest"),
+                 os.path.join(_WORKSPACE, "table-hanging-machine")):
+        if os.path.isfile(os.path.join(cand, _SRC_MARKER)):
+            return cand
+    return None
 
 
 def load_pq_data_package(data_dir: str) -> dict:
@@ -59,7 +86,13 @@ def _collect_string_lists(mod, keywords):
     return out
 
 
-def main(src_root: str = DEFAULT_SRC) -> int:
+def main(src_root=None) -> int:
+    src_root = resolve_src_root(src_root)
+    if not src_root:
+        print("✗ 未找到 progress_quest 数据源。")
+        print("  请用命令行参数指定，或设置环境变量 "
+              f"{ENV_SRC} 指向含 {_SRC_MARKER} 的项目根目录。")
+        return 1
     data_dir = os.path.join(src_root, "data")
     if not os.path.isdir(data_dir):
         print("未找到 progress_quest 数据目录:", data_dir)
@@ -168,4 +201,4 @@ def main(src_root: str = DEFAULT_SRC) -> int:
 
 
 if __name__ == "__main__":
-    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else DEFAULT_SRC))
+    sys.exit(main(sys.argv[1] if len(sys.argv) > 1 else None))
