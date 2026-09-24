@@ -2,7 +2,7 @@ import openpyxl
 import os
 
 # 2026-09-23 去本地化：配置表路径改由 命令行参数 → 仓内相对路径 推导
-# （原 D:/allin/bee/src/resources/config/game_config.xlsx 已不存在）
+# （原路径已不存在）
 import sys
 from pathlib import Path
 
